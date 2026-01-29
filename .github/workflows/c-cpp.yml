@@ -1,4 +1,4 @@
-name: Xcode C/C++ CI
+name: Cross-platform C++ CI (C++11)
 
 on:
   push:
@@ -8,44 +8,45 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install build tools (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+
       - name: Show repo files
         run: ls -la
 
-      - name: List Xcode schemes (for debugging)
-        run: xcodebuild -list -project "Personal Finance Tracker.xcodeproj" || true
-
-      - name: Build using detected shared scheme
-        env:
-          PROJECT: "Personal Finance Tracker.xcodeproj"
+      - name: Build CLI with C++11
         run: |
           set -euo pipefail
-          # Extract shared schemes from xcodebuild output
-          schemes=$(xcodebuild -list -project "$PROJECT" | awk '/Schemes:/{show=1; next} show && NF==0{exit} show{print}' | sed 's/^[[:space:]]*//')
-          if [ -z "$schemes" ]; then
-            echo "No shared schemes found. Make sure you've shared the scheme in Xcode (Product → Scheme → Manage Schemes → check 'Shared') and committed the xcshareddata/xcschemes file."
+          mkdir -p bin
+          if [ "${RUNNER_OS}" = "Linux" ]; then
+            CXX=g++
+          else
+            CXX=clang++
+          fi
+          files=$(git ls-files '*.cpp' | tr '\n' ' ')
+          if [ -z "$files" ]; then
+            echo "No .cpp files detected. Nothing to build."
             exit 1
           fi
-          SCHEME=$(printf "%s\n" "$schemes" | head -n1)
-          echo "Using scheme: $SCHEME"
-          # Build
-          xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release -sdk macosx BUILD_DIR=build clean build
+          echo "Using compiler: $CXX"
+          echo "Compiling sources: $files"
+          $CXX -std=c++11 -O2 -Wall -Wextra -pthread -o bin/pft $files
+          echo "Built: $(file bin/pft || true)"
 
-      - name: Optional: Run tests (if you have test targets)
-        if: always()
-        env:
-          PROJECT: "Personal Finance Tracker.xcodeproj"
+      - name: Run smoke test
         run: |
-          set -euo pipefail
-          schemes=$(xcodebuild -list -project "$PROJECT" | awk '/Schemes:/{show=1; next} show && NF==0{exit} show{print}' | sed 's/^[[:space:]]*//')
-          if [ -z "$schemes" ]; then
-            echo "No shared schemes; skipping tests."
-            exit 0
+          if [ -x bin/pft ]; then
+            echo "Binary exists; running basic invocation (non-fatal)."
+            ./bin/pft --help || ./bin/pft -h || ./bin/pft || true
+          else
+            echo "No binary found; skipping."
           fi
-          SCHEME=$(printf "%s\n" "$schemes" | head -n1)
-          # Run tests on macOS platform (adjust destination if needed)
-          xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release -destination 'platform=macOS' test || true
