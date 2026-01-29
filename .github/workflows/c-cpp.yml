@@ -16,11 +16,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # --------------------
+      # Linux dependencies
+      # --------------------
       - name: Install build tools (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y build-essential
 
-      - name: Setup MSYS2 + MinGW toolchain (Windows)
+      # --------------------
+      # Windows (MSYS2)
+      # --------------------
+      - name: Setup MSYS2 + MinGW (Windows)
         if: matrix.os == 'windows-latest'
         uses: msys2/setup-msys2@v2
         with:
@@ -29,66 +35,95 @@ jobs:
 
       - name: Install MinGW toolchain (Windows)
         if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
         run: pacman -S --noconfirm --needed mingw-w64-x86_64-toolchain
 
-      - name: Show repo files
+      # --------------------
+      # Debug: show files
+      # --------------------
+      - name: Show repo files (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
+        run: ls -la
+
+      - name: Show repo files (non-Windows)
+        if: matrix.os != 'windows-latest'
         shell: bash
         run: ls -la
 
-      - name: Build CLI with C++11
-        shell: bash
+      # --------------------
+      # Build (Windows)
+      # --------------------
+      - name: Build CLI with C++11 (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
         run: |
           set -euo pipefail
           mkdir -p bin
+          export PATH="/mingw64/bin:$PATH"
+          CXX=g++
 
-          # Select compiler by runner OS
-          if [ "${RUNNER_OS}" = "Linux" ]; then
-            CXX=g++
-          elif [ "${RUNNER_OS}" = "Windows" ]; then
-            # MSYS2 / MINGW64 provides g++
-            CXX=g++
-          else
-            CXX=clang++
-          fi
-
-          # Collect .cpp sources safely (handles spaces/newlines in filenames)
           files=()
           while IFS= read -r -d '' f; do
             files+=("$f")
           done < <(git ls-files -z '*.cpp')
 
           if [ ${#files[@]} -eq 0 ]; then
-            echo "No .cpp files detected. Nothing to build."
+            echo "No .cpp files detected."
             exit 1
           fi
 
-          echo "Using compiler: $CXX"
-          printf 'Compiling sources:\n'
-          for f in "${files[@]}"; do printf '  %s\n' "$f"; done
+          "$CXX" -std=c++11 -O2 -Wall -Wextra -pthread -o bin/pft.exe "${files[@]}"
 
-          # Build. Use same flags for all platforms; add platform-specific flags here if needed.
-          "$CXX" -std=c++11 -O2 -Wall -Wextra -pthread -o bin/pft "${files[@]}"
-
-          # Print basic info about binary if possible
-          if command -v file >/dev/null 2>&1; then
-            file bin/pft || true
-          else
-            echo "Built: bin/pft (file utility not available to describe it)"
-          fi
-
-      - name: Run smoke test
+      # --------------------
+      # Build (Linux/macOS)
+      # --------------------
+      - name: Build CLI with C++11 (non-Windows)
+        if: matrix.os != 'windows-latest'
         shell: bash
         run: |
-          if [ "${RUNNER_OS}" = "Windows" ]; then
-            EXE=bin/pft.exe
+          set -euo pipefail
+          mkdir -p bin
+
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            CXX=g++
           else
-            EXE=bin/pft
+            CXX=clang++
           fi
 
-          if [ -x "$EXE" ]; then
-            echo "Binary exists; running basic invocation (non-fatal)."
-            # Try common help flags; ignore non-zero exit from program itself
-            "$EXE" --help || "$EXE" -h || "$EXE" || true
+          files=()
+          while IFS= read -r -d '' f; do
+            files+=("$f")
+          done < <(git ls-files -z '*.cpp')
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No .cpp files detected."
+            exit 1
+          fi
+
+          "$CXX" -std=c++11 -O2 -Wall -Wextra -pthread -o bin/pft "${files[@]}"
+
+      # --------------------
+      # Smoke test
+      # --------------------
+      - name: Smoke test (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
+        run: |
+          if [ -x bin/pft.exe ]; then
+            bin/pft.exe || true
           else
-            echo "No binary found at $EXE; skipping."
+            echo "Executable not found"
+            exit 1
+          fi
+
+      - name: Smoke test (non-Windows)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          if [ -x bin/pft ]; then
+            ./bin/pft || true
+          else
+            echo "Executable not found"
+            exit 1
           fi
