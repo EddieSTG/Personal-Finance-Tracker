@@ -10,7 +10,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -20,7 +20,21 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y build-essential
 
+      - name: Setup MSYS2 + MinGW toolchain (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+
+      - name: Install MinGW toolchain (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash -lc
+        run: |
+          pacman -S --noconfirm --needed mingw-w64-x86_64-toolchain
+
       - name: Show repo files
+        shell: bash
         run: ls -la
 
       - name: Build CLI with C++11
@@ -28,7 +42,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p bin
+
+          # Select compiler by runner OS
           if [ "${RUNNER_OS}" = "Linux" ]; then
+            CXX=g++
+          elif [ "${RUNNER_OS}" = "Windows" ]; then
+            # MSYS2 / MINGW64 provides g++
             CXX=g++
           else
             CXX=clang++
@@ -49,6 +68,29 @@ jobs:
           printf 'Compiling sources:\n'
           for f in "${files[@]}"; do printf '  %s\n' "$f"; done
 
-          # Pass file list as array so filenames with spaces are preserved
+          # Build. Use same flags for all platforms; add platform-specific flags here if needed.
           "$CXX" -std=c++11 -O2 -Wall -Wextra -pthread -o bin/pft "${files[@]}"
-          echo "Built: $(file bin/pft || true)"
+
+          # Print basic info about binary if possible
+          if command -v file >/dev/null 2>&1; then
+            file bin/pft || true
+          else
+            echo "Built: bin/pft (file utility not available to describe it)"
+          fi
+
+      - name: Run smoke test
+        shell: bash
+        run: |
+          if [ "${RUNNER_OS}" = "Windows" ]; then
+            EXE=bin/pft.exe
+          else
+            EXE=bin/pft
+          fi
+
+          if [ -x "$EXE" ]; then
+            echo "Binary exists; running basic invocation (non-fatal)."
+            # Try common help flags; ignore non-zero exit from program itself
+            "$EXE" --help || "$EXE" -h || "$EXE" || true
+          else
+            echo "No binary found at $EXE; skipping."
+          fi
