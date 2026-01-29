@@ -51,6 +51,12 @@ jobs:
         shell: bash
         run: ls -la
 
+      - name: Install Git (Windows / MSYS2)
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
+        run: pacman -S --noconfirm --needed git
+
+
       # --------------------
       # Build (Windows)
       # --------------------
