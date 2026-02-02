@@ -1,17 +1,10 @@
-//
-//  Account.hpp
-//  Personal Finance Tracker
-//
-//  Created by Eduard on 31/01/2026.
-//
-
 #ifndef ACCOUNT_HPP
 #define ACCOUNT_HPP
 
 #include <vector>
 #include <string>
-#include "Transaction.hpp"
 
+class Transaction;
 
 class Account
 {
@@ -32,5 +25,3 @@ private:
 };
 
 #endif
-
-

@@ -10,6 +10,7 @@
 
 #include <string>
 #include <chrono>
+#include "Transaction.hpp"
 
 class Transaction
 {
