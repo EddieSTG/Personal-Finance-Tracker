@@ -1,5 +1,5 @@
-#ifndef ACCOUNT_HPP
-#define ACCOUNT_HPP
+#ifndef Account_hpp
+#define Account_hpp
 
 #include <vector>
 #include <string>

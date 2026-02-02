@@ -5,8 +5,8 @@
 //  Created by Eduard on 31/01/2026.
 //
 
-#ifndef TRANSACTION_HPP
-#define TRANSACTION_HPP
+#ifndef Transaction_hpp
+#define Transaction_hpp
 
 #include <string>
 #include <chrono>
