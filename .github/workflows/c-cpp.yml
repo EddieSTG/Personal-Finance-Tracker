@@ -79,8 +79,7 @@ jobs:
             exit 1
           fi
 
-          "$CXX" -std=c++11 -O2 -Wall -Wextra -pthread -o bin/pft.exe "${files[@]}"
-
+          "$CXX" -std=c++11 -O2 -Wall -Wextra -pthread -I"Personal Finance Tracker/AccountF" -I"Personal Finance Tracker" -o bin/pft "${files[@]}"
       # --------------------
       # Build (Linux/macOS)
       # --------------------
@@ -107,7 +106,10 @@ jobs:
             exit 1
           fi
 
-          "$CXX" -std=c++11 -O2 -Wall -Wextra -pthread -o bin/pft "${files[@]}"
+          "$CXX" -std=c++11 -O2 -Wall -Wextra -pthread \
+          -I"Personal Finance Tracker/AccountF" \
+          -I"Personal Finance Tracker" \
+          -o bin/pft "${files[@]}"
 
       # --------------------
       # Smoke test
