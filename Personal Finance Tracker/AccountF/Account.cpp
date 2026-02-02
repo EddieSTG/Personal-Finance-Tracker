@@ -7,6 +7,7 @@
 
 
 #include "Account.hpp"
+#include "Transaction.hpp"
 #include <fstream>
 #include <iostream>
 
