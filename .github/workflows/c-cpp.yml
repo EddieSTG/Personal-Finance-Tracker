@@ -1,52 +1,56 @@
-name: C++ CI/CD
+name: C++ Cross‑Platform CI
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
 
 jobs:
-  build-and-test:
-    runs-on: ${{ matrix.os }}
+  build-test:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Install dependencies per OS
-      - name: Install dependencies (Linux)
+      # Install CMake + tools per OS
+      - name: Install tools (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake
 
-      - name: Install dependencies (Windows)
+      - name: Install tools (Windows)
         if: runner.os == 'Windows'
         run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
 
-      - name: Install dependencies (macOS)
+      - name: Install tools (macOS)
         if: runner.os == 'macOS'
         run: brew install cmake
 
       # Build
-      - name: Create build directory
+      - name: Prepare build dir
         run: mkdir -p build || New-Item -ItemType Directory build
 
-      - name: Configure CMake
+      - name: Configure with CMake
         run: cmake -S . -B build
 
-      - name: Build project
+      - name: Compile
         run: cmake --build build
 
-      # Run tests if you have them
+      # Run tests (optional)
       - name: Run tests
-        run: ctest --output-on-failure --test-dir build
-        continue-on-error: false  # fails workflow if tests fail
+        run: |
+          if [ -f build/CTestTestfile.cmake ]; then
+            ctest --output-on-failure --test-dir build
+          fi
 
-      # Upload build artifacts
+      # Upload artifacts with v4
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: cpp-build-${{ runner.os }}
+          name: build-artifacts-${{ matrix.os }}
           path: build/
+          if-no-files-found: error
+          
