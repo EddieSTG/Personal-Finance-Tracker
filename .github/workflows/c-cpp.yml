@@ -1,4 +1,4 @@
-name: C++ Cross‑Platform CI
+name: Build Xcode Project
 
 on:
   push:
@@ -6,51 +6,22 @@ on:
   pull_request:
 
 jobs:
-  build-test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+  build-macos:
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Install CMake + tools per OS
-      - name: Install tools (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
-
-      - name: Install tools (Windows)
-        if: runner.os == 'Windows'
-        run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
-
-      - name: Install tools (macOS)
-        if: runner.os == 'macOS'
-        run: brew install cmake
-
-      # Build
-      - name: Prepare build dir
-        run: mkdir -p build || New-Item -ItemType Directory build
-
-      - name: Configure with CMake
-        run: cmake -S . -B build
-
-      - name: Compile
-        run: cmake --build build
-
-      # Run tests (optional)
-      - name: Run tests
+      - name: Build Xcode project
         run: |
-          if [ -f build/CTestTestfile.cmake ]; then
-            ctest --output-on-failure --test-dir build
-          fi
-
-      # Upload artifacts with v4
+          xcodebuild -project "Personal Finance Tracker.xcodeproj" \
+                     -scheme "Personal Finance Tracker" \
+                     -configuration Release \
+                     -derivedDataPath build
+          
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts-${{ matrix.os }}
-          path: build/
-          if-no-files-found: error
-          
+          name: build-artifacts-macos
+          path: build
