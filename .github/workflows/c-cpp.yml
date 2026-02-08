@@ -1,137 +1,38 @@
-name: Cross-platform C++ CI (C++11)
+name: C++ Cross-Platform Build
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   pull_request:
-    branches: ["main"]
 
 jobs:
   build:
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      # --------------------
-      # Linux dependencies
-      # --------------------
-      - name: Install build tools (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y build-essential
+      - name: Install dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
 
-      # --------------------
-      # Windows (MSYS2)
-      # --------------------
-      - name: Setup MSYS2 + MinGW (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
+      - name: Install dependencies
+        if: runner.os == 'Windows'
+        run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
 
-      - name: Install MinGW toolchain (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: msys2 {0}
-        run: pacman -S --noconfirm --needed mingw-w64-x86_64-toolchain
+      - name: Install dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake
 
-      # --------------------
-      # Debug: show files
-      # --------------------
-      - name: Show repo files (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: msys2 {0}
-        run: ls -la
+      - name: Create build directory
+        run: mkdir -p build || New-Item -ItemType Directory build
 
-      - name: Show repo files (non-Windows)
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: ls -la
+      - name: Configure CMake
+        run: cmake -S . -B build
 
-      - name: Install Git (Windows / MSYS2)
-        if: matrix.os == 'windows-latest'
-        shell: msys2 {0}
-        run: pacman -S --noconfirm --needed git
-
-
-      # --------------------
-      # Build (Windows)
-      # --------------------
-      - name: Build CLI with C++11 (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: msys2 {0}
-        run: |
-          set -euo pipefail
-          mkdir -p bin
-          export PATH="/mingw64/bin:$PATH"
-          CXX=g++
-
-          files=()
-          while IFS= read -r -d '' f; do
-            files+=("$f")
-          done < <(git ls-files -z '*.cpp')
-
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No .cpp files detected."
-            exit 1
-          fi
-
-          "$CXX" -std=c++11 -O2 -Wall -Wextra -pthread -I"Personal Finance Tracker/AccountF" -I"Personal Finance Tracker" -o bin/pft "${files[@]}"
-      # --------------------
-      # Build (Linux/macOS)
-      # --------------------
-      - name: Build CLI with C++11 (non-Windows)
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p bin
-
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            CXX=g++
-          else
-            CXX=clang++
-          fi
-
-          files=()
-          while IFS= read -r -d '' f; do
-            files+=("$f")
-          done < <(git ls-files -z '*.cpp')
-
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No .cpp files detected."
-            exit 1
-          fi
-
-          "$CXX" -std=c++11 -O2 -Wall -Wextra -pthread \
-          -I"Personal Finance Tracker/AccountF" \
-          -I"Personal Finance Tracker" \
-          -o bin/pft "${files[@]}"
-
-      # --------------------
-      # Smoke test
-      # --------------------
-      - name: Smoke test (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: msys2 {0}
-        run: |
-          if [ -x bin/pft.exe ]; then
-            bin/pft.exe || true
-          else
-            echo "Executable not found"
-            exit 1
-          fi
-
-      - name: Smoke test (non-Windows)
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          if [ -x bin/pft ]; then
-            ./bin/pft || true
-          else
-            echo "Executable not found"
-            exit 1
-          fi
+      - name: Build project
+        run: cmake --build build
