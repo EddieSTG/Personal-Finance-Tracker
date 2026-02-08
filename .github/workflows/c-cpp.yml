@@ -1,4 +1,4 @@
-name: C++ Cross-Platform Build
+name: C++ CI/CD
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -16,18 +16,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install dependencies
+      # Install dependencies per OS
+      - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake
 
-      - name: Install dependencies
+      - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
 
-      - name: Install dependencies
+      - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: brew install cmake
 
+      # Build
       - name: Create build directory
         run: mkdir -p build || New-Item -ItemType Directory build
 
@@ -36,3 +38,15 @@ jobs:
 
       - name: Build project
         run: cmake --build build
+
+      # Run tests if you have them
+      - name: Run tests
+        run: ctest --output-on-failure --test-dir build
+        continue-on-error: false  # fails workflow if tests fail
+
+      # Upload build artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: cpp-build-${{ runner.os }}
+          path: build/
